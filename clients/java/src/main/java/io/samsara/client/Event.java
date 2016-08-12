@@ -91,10 +91,10 @@ public class Event {
 
         public Event build() {
             if (instance.eventName == null) {
-                throw new IllegalArgumentException("Event Name cannot be null"); // this might not be the correct exception, placeholder for now.
+                throw new IllegalArgumentException("Event Name cannot be null"); // TODO: this might not be the correct exception, placeholder for now.
             }
             else if (instance.sourceId == null) {
-                throw new IllegalArgumentException("Event Name cannot be null"); // this might not be the correct exception, placeholder for now.
+                throw new IllegalArgumentException("Event Name cannot be null"); // TODO: this might not be the correct exception, placeholder for now.
             }
             return instance;
         }

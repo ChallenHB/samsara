@@ -3,8 +3,10 @@ package io.samsara.client;
 import java.io.IOException;
 import java.util.Collection;
 
+import com.google.gson.GsonBuilder;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.fluent.Request;
+import org.apache.http.entity.StringEntity;
 
 /**
  *
@@ -29,20 +31,21 @@ public class SamsaraClient {
         }
     }
 
-    public void publishEvent(String url, Collection<Event> events) {
+    public HttpResponse publishEvent(String url, Collection<Event> events) {
         try {
-             HttpResponse reponse = Request.Post(url + "/v1/events")
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Content-Encoding", "identity") // This needs to be gzip if we're doing compression
-                    .addHeader("X-Samsara-publishedTimestamp", Long.toString(System.currentTimeMillis()))
-                    .addHeader("Accept", "application/json")
-                    .body(null)
-                    .connectTimeout(connectTimeout)
-                    .socketTimeout(socketTimeout)
-                    .execute().returnResponse();
+             return Request.Post(url + "/v1/events")
+                     .addHeader("Content-Type", "application/json")
+                     .addHeader("Content-Encoding", "identity") // This needs to be gzip if we're doing compression
+                     .addHeader("X-Samsara-publishedTimestamp", Long.toString(System.currentTimeMillis()))
+                     .addHeader("Accept", "application/json")
+                     .body(new StringEntity(serializeEvents(events)))
+                     .connectTimeout(connectTimeout)
+                     .socketTimeout(socketTimeout)
+                     .execute().returnResponse();
         } catch (IOException e) {
             // Add some logging here
         }
+        return null;
     }
 
     public void recordEvent(Event event) {
@@ -60,14 +63,14 @@ public class SamsaraClient {
     }
 
     private Thread createPublishingThread() {
-        return new Thread(new Runnable() { // Don't want to use lambda here to make it compatible with pre-java 8
+        return new Thread(new Runnable() {
             @Override
             public void run() {
                 while(true) {
                     try {
                         Thread.sleep(publishInterval);
                     } catch(InterruptedException e) {
-                        // Might need to add some clean up code, depending on how we use the http component
+                        // Might need to add some clean up code, but for now we don't need it.
                         Thread.currentThread().interrupt();
                         break;
                     }
@@ -75,5 +78,11 @@ public class SamsaraClient {
                 }
             }
         });
+    }
+
+    private String serializeEvents(Collection<Event> events) {
+        GsonBuilder builder = new GsonBuilder();
+        builder.registerTypeAdapter(Event.class, new EventSerializer());
+        return builder.create().toJson(events);
     }
 }
