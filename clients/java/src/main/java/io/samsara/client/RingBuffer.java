@@ -15,9 +15,9 @@ public interface RingBuffer {
 
     public boolean add(Event event);
 
-    public boolean remove(List<Event> event);
+    public boolean remove(Collection<Event> event);
 
-    public Collection<Event> returnAll();
+    public Collection<Event> getSnapshot();
 
     public int size();
 }

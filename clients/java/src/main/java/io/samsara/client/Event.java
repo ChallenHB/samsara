@@ -73,12 +73,12 @@ public class Event {
             return this;
         }
 
-        public EventBuilder time(long timestamp) {
+        public EventBuilder timestamp(long timestamp) {
             instance.timestamp = timestamp;
             return this;
         }
 
-        public EventBuilder newField(String name, String value) {
+        public EventBuilder prop(String name, String value) {
             if (name == null || name.trim().isEmpty()) {
                 throw new IllegalArgumentException("Field name cannot be null or empty");
             }
@@ -90,12 +90,12 @@ public class Event {
         }
 
         public Event build() {
-            if (instance.eventName == null) {
-                throw new IllegalArgumentException("Event Name cannot be null"); // TODO: this might not be the correct exception, placeholder for now.
-            }
-            else if (instance.sourceId == null) {
-                throw new IllegalArgumentException("Event Name cannot be null"); // TODO: this might not be the correct exception, placeholder for now.
-            }
+            if (instance.eventName == null)
+                throw new NullPointerException("Event Name cannot be null");
+            else if (instance.sourceId == null)
+                throw new NullPointerException("Event Name cannot be null");
+            if (instance.timestamp == null)
+                instance.timestamp = System.currentTimeMillis();
             return instance;
         }
 

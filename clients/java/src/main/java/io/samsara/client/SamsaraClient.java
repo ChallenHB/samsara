@@ -1,88 +1,124 @@
 package io.samsara.client;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.zip.GZIPOutputStream;
 
 import com.google.gson.GsonBuilder;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.StatusLine;
+import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.fluent.Request;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.StringEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  */
 public class SamsaraClient {
 
-    private RingBuffer buffer = new DefaultRingBufferImpl();
-    private String url;
-    private Thread thread;
-    private String sourceId;
-    private int maxBufferSize = 10;
-    private int minBufferSize = 5;
-    private int publishInterval = 30000;
-    private int connectTimeout = 30000;
-    private int socketTimeout = 30000;
+    private static final Logger logger = LoggerFactory.getLogger(SamsaraClient.class);
 
-    public SamsaraClient(boolean startPublishingThread, String url) {
-        this.url = url;
-        thread = createPublishingThread();
+    private RingBuffer buffer = new DefaultRingBufferImpl();
+    private Thread thread;
+    private SamsaraClientConfig config;
+
+    public SamsaraClient(String url, boolean startPublishingThread) {
+        this(SamsaraClientConfig.builder().url(url).build(), startPublishingThread);
+    }
+
+    public SamsaraClient(SamsaraClientConfig config, boolean startPublishingThread) {
+        this.config = config;
+        this.thread = new Thread(this::publishWithInterval);
+        this.buffer = new DefaultRingBufferImpl(config.getMaxBufferSize());
         if (startPublishingThread) {
             thread.start();
         }
     }
 
-    public HttpResponse publishEvent(String url, Collection<Event> events) {
+    public boolean publishEvent(String url, Collection<Event> events) throws IOException {
+        HttpEntity entity;
         try {
-             return Request.Post(url + "/v1/events")
-                     .addHeader("Content-Type", "application/json")
-                     .addHeader("Content-Encoding", "identity") // This needs to be gzip if we're doing compression
-                     .addHeader("X-Samsara-publishedTimestamp", Long.toString(System.currentTimeMillis()))
-                     .addHeader("Accept", "application/json")
-                     .body(new StringEntity(serializeEvents(events)))
-                     .connectTimeout(connectTimeout)
-                     .socketTimeout(socketTimeout)
-                     .execute().returnResponse();
+            entity = createEntity(events, config.isGzipCompression());
         } catch (IOException e) {
-            // Add some logging here
+            throw e;
         }
-        return null;
+        try {
+            return Request.Post(url + "/v1/events")
+                           .addHeader("Content-Type", "application/json")
+                           .addHeader("Content-Encoding", config.isGzipCompression() ? "gzip" : "identity")
+                           .addHeader("X-Samsara-publishedTimestamp", Long.toString(System.currentTimeMillis()))
+                           .addHeader("Accept", "application/json")
+                           .body(entity)
+                           .connectTimeout(config.getConnectTimeout())
+                           .socketTimeout(config.getSocketTimeout())
+                           .execute().handleResponse((final HttpResponse response) -> {
+                                StatusLine status = response.getStatusLine();
+                                if (status.getStatusCode() != HttpStatus.SC_ACCEPTED) {
+                                    throw new HttpResponseException(status.getStatusCode(), status.getReasonPhrase());
+                                }
+                                return true;
+                            });
+        } catch (IOException e) {
+            logger.error("Error connecting to Samsara server");
+            throw e;
+        }
     }
 
     public void recordEvent(Event event) {
-        if (event.getSourceId() == null) {
-            Event.cloneWithSourceId(event, sourceId);
-        }
-        if (event.getTimestamp() == null) {
-            Event.cloneWithTimestamp(event, System.currentTimeMillis());
-        }
         buffer.add(event);
     }
 
-    private void flushBuffer() {
-
+    public void flushBuffer() throws IOException {
+        Collection<Event> events = buffer.getSnapshot();
+        if (publishEvent(config.getUrl(), events)) {
+            buffer.remove(events);
+        }
     }
 
-    private Thread createPublishingThread() {
-        return new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while(true) {
-                    try {
-                        Thread.sleep(publishInterval);
-                    } catch(InterruptedException e) {
-                        // Might need to add some clean up code, but for now we don't need it.
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+    private void publishWithInterval() {
+        logger.info("Starting publishing thread");
+        while (true) {
+            try {
+                Thread.sleep(config.getPublishInterval());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            if (buffer.size() >= config.getMinBufferSize()) {
+                try {
                     flushBuffer();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    Thread.currentThread().interrupt();
+                    break;
                 }
             }
-        });
+        }
     }
 
-    private String serializeEvents(Collection<Event> events) {
+    private HttpEntity createEntity(Collection<Event> events, boolean gzipCompress) throws IOException {
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(Event.class, new EventSerializer());
-        return builder.create().toJson(events);
+        String json = builder.create().toJson(events);
+        if (gzipCompress) {
+            ByteArrayOutputStream inputStream = new ByteArrayOutputStream(json.length());
+            byte[] compressedJson;
+            try (GZIPOutputStream gzipStream = new GZIPOutputStream(inputStream)) {
+                gzipStream.write(json.getBytes());
+                compressedJson = inputStream.toByteArray();
+            } catch (IOException e) {
+                logger.error("Error during gzip compression");
+                throw e;
+            }
+            return new ByteArrayEntity(compressedJson);
+        }
+        return new StringEntity(json);
     }
+
 }

@@ -1,5 +1,6 @@
 package io.samsara.client;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Queue;
@@ -13,7 +14,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class DefaultRingBufferImpl implements RingBuffer {
 
-    private final static int DEFAULT_MAX_SIZE = 100;
+    private final static int DEFAULT_MAX_SIZE = 1000;
 
     private final int maxSize;
     private Queue<Event> queue = new ConcurrentLinkedQueue<>();
@@ -36,13 +37,13 @@ public class DefaultRingBufferImpl implements RingBuffer {
     }
 
     @Override
-    public boolean remove(List<Event> events) {
+    public boolean remove(Collection<Event> events) {
         return queue.removeAll(events);
     }
 
     @Override
-    public Collection<Event> returnAll() {
-        return queue;
+    public Collection<Event> getSnapshot() {
+        return new ArrayList<>(queue);
     }
 
     @Override
