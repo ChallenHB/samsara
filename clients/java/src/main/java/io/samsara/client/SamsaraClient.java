@@ -94,9 +94,9 @@ public class SamsaraClient {
                 try {
                     flushBuffer();
                 } catch (IOException e) {
-                    Thread.currentThread().interrupt();
-                    logger.error("Shutting down publishing thread"); // Decide what to do here`
+                    logger.error("Shutting down publishing thread");
                     logger.error(e.getMessage(), e);
+                    Thread.currentThread().interrupt();
                     break;
                 }
             }

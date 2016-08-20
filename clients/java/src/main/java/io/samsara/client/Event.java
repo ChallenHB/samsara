@@ -11,16 +11,16 @@ public class Event {
     private String sourceId;
     private String eventName;
     private Long timestamp;
-    private Map<String, String> additionalFields = new HashMap<>();
+    private Map<String, String> properties = new HashMap<>();
 
     private Event() {
     }
 
-    public Event(String sourceId, String eventName, Long timestamp, Map<String, String> additionalFields) {
+    public Event(String sourceId, String eventName, Long timestamp, Map<String, String> properties) {
         this.sourceId = sourceId;
         this.eventName = eventName;
         this.timestamp = timestamp;
-        this.additionalFields = additionalFields;
+        this.properties = properties;
     }
 
     public static EventBuilder builder() {
@@ -39,16 +39,20 @@ public class Event {
         return timestamp;
     }
 
-    public Map<String, String> getAdditionalFields() {
-        return additionalFields;
+    public Map<String, String> getProperties() {
+        return properties;
+    }
+
+    public String getProperty(String propertyName) {
+        return properties.get(propertyName);
     }
 
     public static Event cloneWithSourceId(Event event, String sourceId) {
-        return new Event(sourceId, event.getEventName(), event.getTimestamp(), event.getAdditionalFields());
+        return new Event(sourceId, event.getEventName(), event.getTimestamp(), event.getProperties());
     }
 
     public static Event cloneWithTimestamp(Event event, long timestamp) {
-        return new Event(event.getSourceId(), event.getEventName(), timestamp, event.getAdditionalFields());
+        return new Event(event.getSourceId(), event.getEventName(), timestamp, event.getProperties());
     }
 
     public static class EventBuilder {
@@ -80,12 +84,12 @@ public class Event {
 
         public EventBuilder prop(String name, String value) {
             if (name == null || name.trim().isEmpty()) {
-                throw new IllegalArgumentException("Field name cannot be null or empty");
+                throw new IllegalArgumentException("Property name cannot be null or empty");
             }
             if (value == null) {
-                throw new IllegalArgumentException("Field value cannot be null");
+                throw new IllegalArgumentException("Property value cannot be null");
             }
-            instance.additionalFields.put(name, value);
+            instance.properties.put(name, value);
             return this;
         }
 
@@ -93,7 +97,7 @@ public class Event {
             if (instance.eventName == null)
                 throw new NullPointerException("Event Name cannot be null");
             else if (instance.sourceId == null)
-                throw new NullPointerException("Event Name cannot be null");
+                throw new NullPointerException("Source Id cannot be null");
             if (instance.timestamp == null)
                 instance.timestamp = System.currentTimeMillis();
             return instance;

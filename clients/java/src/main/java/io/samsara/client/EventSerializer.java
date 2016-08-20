@@ -17,8 +17,8 @@ public class EventSerializer implements JsonSerializer<Event> {
         json.addProperty("eventName", src.getEventName());
         json.addProperty("sourceId", src.getSourceId());
         json.addProperty("timestamp", src.getTimestamp());
-        for (String key: src.getAdditionalFields().keySet()) {
-            json.addProperty(key, src.getAdditionalFields().get(key));
+        for (String key: src.getProperties().keySet()) {
+            json.addProperty(key, src.getProperties().get(key));
         }
         return json;
     }
