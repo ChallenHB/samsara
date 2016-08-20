@@ -94,8 +94,9 @@ public class SamsaraClient {
                 try {
                     flushBuffer();
                 } catch (IOException e) {
-                    e.printStackTrace();
                     Thread.currentThread().interrupt();
+                    logger.error("Shutting down publishing thread"); // Decide what to do here`
+                    logger.error(e.getMessage(), e);
                     break;
                 }
             }
@@ -106,17 +107,16 @@ public class SamsaraClient {
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(Event.class, new EventSerializer());
         String json = builder.create().toJson(events);
+        System.out.println(json);
         if (gzipCompress) {
             ByteArrayOutputStream inputStream = new ByteArrayOutputStream(json.length());
-            byte[] compressedJson;
             try (GZIPOutputStream gzipStream = new GZIPOutputStream(inputStream)) {
-                gzipStream.write(json.getBytes());
-                compressedJson = inputStream.toByteArray();
+                gzipStream.write(json.getBytes("utf-8"));
             } catch (IOException e) {
                 logger.error("Error during gzip compression");
                 throw e;
             }
-            return new ByteArrayEntity(compressedJson);
+            return new ByteArrayEntity(inputStream.toByteArray());
         }
         return new StringEntity(json);
     }
